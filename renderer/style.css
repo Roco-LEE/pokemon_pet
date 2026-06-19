@@ -1,0 +1,64 @@
+/* 투명 배경, 스프라이트 꽉 채우기, 픽셀아트 선명하게 */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  /* 텍스트/이미지 드래그 선택 방지 */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+#stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end; /* 바닥에 발 붙도록 하단 정렬 */
+  justify-content: center;
+}
+
+#sprite {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated; /* 픽셀아트 확대 시 선명 */
+  pointer-events: auto;
+  transform-origin: center bottom;
+  transition: transform 0.05s linear;
+}
+
+/* 진행 방향에 따라 좌우 반전 */
+#sprite.flip {
+  transform: scaleX(-1);
+}
+
+/* 클릭 반응(REACT) — 통통 튀기 */
+#sprite.react {
+  animation: bounce 0.5s ease;
+}
+#sprite.react.flip {
+  animation: bounce-flip 0.5s ease;
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-18%) scale(1.08, 0.95); }
+  60% { transform: translateY(0) scale(0.96, 1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes bounce-flip {
+  0% { transform: scaleX(-1) translateY(0) scale(1); }
+  30% { transform: scaleX(-1) translateY(-18%) scale(1.08, 0.95); }
+  60% { transform: scaleX(-1) translateY(0) scale(0.96, 1.05); }
+  100% { transform: scaleX(-1) translateY(0) scale(1); }
+}
+
+/* 드래그 중 커서 */
+body.dragging {
+  cursor: grabbing;
+}
