@@ -19,4 +19,7 @@ contextBridge.exposeInMainWorld('pet', {
   // 메인 → 렌더러 이벤트 구독
   onSetPokemon: (cb) => ipcRenderer.on('set-pokemon', (_e, data) => cb(data)),
   onWalkToggle: (cb) => ipcRenderer.on('walk-toggle', (_e, enabled) => cb(enabled)),
+  onSoundToggle: (cb) => ipcRenderer.on('sound-toggle', (_e, enabled) => cb(enabled)),
+  onSpeechToggle: (cb) => ipcRenderer.on('speech-toggle', (_e, enabled) => cb(enabled)),
+  onSleepToggle: (cb) => ipcRenderer.on('sleep-toggle', (_e, enabled) => cb(enabled)),
 });

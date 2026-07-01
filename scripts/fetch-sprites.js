@@ -17,7 +17,12 @@ const POKEMON = [
 const BASE =
   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated';
 
+// PokeAPI cries(울음소리) — latest 세대 .ogg
+const CRIES_BASE =
+  'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest';
+
 const OUT_DIR = path.join(__dirname, '..', 'assets', 'sprites');
+const CRIES_DIR = path.join(__dirname, '..', 'assets', 'cries');
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {
@@ -59,13 +64,32 @@ async function fetchOne(p, shiny) {
   }
 }
 
+async function fetchCry(p) {
+  fs.mkdirSync(CRIES_DIR, { recursive: true });
+  const dest = path.join(CRIES_DIR, `${p.id}.ogg`);
+  const label = `${p.ko}(${p.id}) 울음소리`;
+  if (fs.existsSync(dest) && fs.statSync(dest).size > 0) {
+    console.log(`✓ ${label} 이미 있음 — 건너뜀`);
+    return;
+  }
+  const url = `${CRIES_BASE}/${p.id}.ogg`;
+  process.stdout.write(`↓ ${label} 다운로드 중... `);
+  try {
+    await download(url, dest);
+    console.log('완료');
+  } catch (err) {
+    console.log('실패:', err.message);
+  }
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   for (const p of POKEMON) {
     await fetchOne(p, false);
     await fetchOne(p, true);
+    await fetchCry(p);
   }
-  console.log('\n스프라이트 준비 완료 →', OUT_DIR);
+  console.log('\n스프라이트·울음소리 준비 완료 →', OUT_DIR);
 }
 
 main();

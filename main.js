@@ -12,11 +12,17 @@ const DEFAULT_CONFIG = {
   margin: 24,
   walk: { enabled: true, minIntervalSec: 8, maxIntervalSec: 20, speed: 1.0, rangeFraction: 0.15 },
   sound: { enabled: false },
+  speech: { enabled: true, minIntervalSec: 25, maxIntervalSec: 60 },
+  sleep: { enabled: true, idleMinutes: 5, nightStart: 22, nightEnd: 7 },
   shiny: false,
 };
 
 // 펫(스프라이트) 원본 픽셀 크기. Gen5 애니메이션 GIF는 대략 96px 캔버스.
 const SPRITE_BASE = 96;
+
+// 창 여백(스프라이트 footprint 대비 비율). 점프/버둥 시 잘리지 않도록 확보.
+const PAD_TOP_FRAC = 0.45; // 위쪽 점프 헤드룸
+const PAD_SIDE_FRAC = 0.15; // 좌우 버둥(회전) 여유
 
 const POKEMON = [
   { id: 1, ko: '이상해씨' },
@@ -59,30 +65,44 @@ function getLeftMostDisplay() {
   return displays.reduce((a, b) => (b.bounds.x < a.bounds.x ? b : a));
 }
 
+// 스프라이트 footprint(바닥에 닿는 실제 표시 크기)
 function petSize() {
   const s = Math.max(1, config.scale);
   return SPRITE_BASE * s;
 }
 
-// 좌측 모니터 좌하단 좌표 계산
+// 실제 창 크기 = footprint + 여백(점프/버둥 헤드룸)
+function windowSize() {
+  const pet = petSize();
+  return {
+    w: Math.round(pet * (1 + PAD_SIDE_FRAC * 2)),
+    h: Math.round(pet * (1 + PAD_TOP_FRAC)),
+  };
+}
+
+// 좌측 모니터 좌하단 좌표 계산. 스프라이트가 (여백을 제외하고) 좌하단에 붙도록.
 function bottomLeftPosition() {
   const d = getLeftMostDisplay();
   const { x, y, height } = d.workArea;
-  const size = petSize();
+  const win = windowSize();
+  const pet = petSize();
   const m = config.margin;
+  const padSide = Math.round(pet * PAD_SIDE_FRAC);
   return {
-    x: Math.round(x + m),
-    y: Math.round(y + height - size - m),
+    // 스프라이트 왼쪽이 workArea.x + margin 에 오도록 창은 좌측 여백만큼 더 왼쪽에
+    x: Math.round(x + m - padSide),
+    // 스프라이트 바닥(=창 바닥)이 workArea 하단 - margin 에 오도록
+    y: Math.round(y + height - win.h - m),
   };
 }
 
 function createWindow() {
-  const size = petSize();
+  const win0 = windowSize();
   const pos = bottomLeftPosition();
 
   win = new BrowserWindow({
-    width: size,
-    height: size,
+    width: win0.w,
+    height: win0.h,
     x: pos.x,
     y: pos.y,
     transparent: true,
@@ -106,7 +126,8 @@ function createWindow() {
   const reposition = () => {
     if (!win) return;
     const p = bottomLeftPosition();
-    win.setBounds({ x: p.x, y: p.y, width: petSize(), height: petSize() });
+    const s = windowSize();
+    win.setBounds({ x: p.x, y: p.y, width: s.w, height: s.h });
   };
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
@@ -162,6 +183,36 @@ function buildContextMenu() {
         win && win.webContents.send('walk-toggle', config.walk.enabled);
       },
     },
+    {
+      label: '울음소리 켜기/끄기',
+      type: 'checkbox',
+      checked: config.sound.enabled,
+      click: () => {
+        config.sound.enabled = !config.sound.enabled;
+        saveConfig();
+        win && win.webContents.send('sound-toggle', config.sound.enabled);
+      },
+    },
+    {
+      label: '말풍선 켜기/끄기',
+      type: 'checkbox',
+      checked: config.speech.enabled,
+      click: () => {
+        config.speech.enabled = !config.speech.enabled;
+        saveConfig();
+        win && win.webContents.send('speech-toggle', config.speech.enabled);
+      },
+    },
+    {
+      label: '수면 모드 켜기/끄기',
+      type: 'checkbox',
+      checked: config.sleep.enabled,
+      click: () => {
+        config.sleep.enabled = !config.sleep.enabled;
+        saveConfig();
+        win && win.webContents.send('sleep-toggle', config.sleep.enabled);
+      },
+    },
     { type: 'separator' },
     { label: '위치 좌하단으로 리셋', click: () => resetPosition() },
     { label: '종료', click: () => app.quit() },
@@ -171,7 +222,8 @@ function buildContextMenu() {
 function resetPosition() {
   if (!win) return;
   const p = bottomLeftPosition();
-  win.setBounds({ x: p.x, y: p.y, width: petSize(), height: petSize() });
+  const s = windowSize();
+  win.setBounds({ x: p.x, y: p.y, width: s.w, height: s.h });
 }
 
 // ---------- IPC ----------
@@ -203,9 +255,11 @@ ipcMain.handle('get-init', () => {
     config,
     pokemonId: config.currentPokemonId,
     spritesDir: path.join(__dirname, 'assets', 'sprites'),
+    criesDir: path.join(__dirname, 'assets', 'cries'),
     bounds: win ? win.getBounds() : null,
     workArea: currentWorkArea(),
     spriteBase: SPRITE_BASE,
+    petFootprint: petSize(),
   };
 });
 

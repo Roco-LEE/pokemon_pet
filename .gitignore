@@ -6,6 +6,7 @@ dist/
 
 # 저작권 에셋 — 레포에 재배포하지 않음. `npm run fetch`로 각자 받음.
 assets/sprites/
+assets/cries/
 
 # 로그/캐시
 *.log

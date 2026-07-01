@@ -15,6 +15,7 @@ body {
 }
 
 #stage {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -23,9 +24,11 @@ body {
 }
 
 #sprite {
-  width: 100%;
-  height: 100%;
+  /* 창은 점프/버둥 헤드룸만큼 크지만, 스프라이트는 footprint 크기로 하단 중앙 배치 */
+  width: var(--pet, 100%);
+  height: var(--pet, 100%);
   object-fit: contain;
+  object-position: center bottom;
   image-rendering: pixelated; /* 픽셀아트 확대 시 선명 */
   pointer-events: auto;
   transform-origin: center bottom;
@@ -61,4 +64,112 @@ body {
 /* 드래그 중 커서 */
 body.dragging {
   cursor: grabbing;
+}
+
+/* ---------- 드래그(들어올림) 버둥거림 ---------- */
+#sprite.lifted {
+  animation: wiggle 0.35s ease-in-out infinite;
+}
+#sprite.lifted.flip {
+  animation: wiggle-flip 0.35s ease-in-out infinite;
+}
+@keyframes wiggle {
+  0%   { transform: rotate(0deg) translateY(0); }
+  25%  { transform: rotate(-7deg) translateY(-4%); }
+  50%  { transform: rotate(0deg) translateY(0); }
+  75%  { transform: rotate(7deg) translateY(-4%); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+@keyframes wiggle-flip {
+  0%   { transform: scaleX(-1) rotate(0deg) translateY(0); }
+  25%  { transform: scaleX(-1) rotate(-7deg) translateY(-4%); }
+  50%  { transform: scaleX(-1) rotate(0deg) translateY(0); }
+  75%  { transform: scaleX(-1) rotate(7deg) translateY(-4%); }
+  100% { transform: scaleX(-1) rotate(0deg) translateY(0); }
+}
+
+/* ---------- 수면 모드 ---------- */
+#sprite.sleeping {
+  filter: brightness(0.7) saturate(0.6);
+  transform: scaleY(0.92);
+}
+#sprite.sleeping.flip {
+  transform: scaleX(-1) scaleY(0.92);
+}
+
+/* 기상 직후 굼뜬(느린) 상태 — 이동 전환/반응을 느리게 */
+#sprite.groggy {
+  transition: transform 0.35s ease;
+  filter: brightness(0.9);
+}
+#sprite.groggy.react,
+#sprite.groggy.react.flip {
+  animation-duration: 0.9s; /* 반응(통통)도 굼뜨게 */
+}
+
+/* Zzz 표시 (스프라이트 우상단에서 떠오름) */
+#zzz {
+  position: absolute;
+  top: 8%;
+  right: 14%;
+  display: none;
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  color: #cfe3ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 3;
+}
+#zzz.show {
+  display: block;
+}
+#zzz span {
+  display: inline-block;
+  opacity: 0;
+  animation: zfloat 3s ease-in-out infinite;
+}
+#zzz span:nth-child(1) { font-size: 12px; animation-delay: 0s; }
+#zzz span:nth-child(2) { font-size: 16px; animation-delay: 0.6s; }
+#zzz span:nth-child(3) { font-size: 20px; animation-delay: 1.2s; }
+@keyframes zfloat {
+  0%   { opacity: 0; transform: translate(0, 6px); }
+  30%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(8px, -14px); }
+}
+
+/* ---------- 말풍선 ---------- */
+#bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 88%;
+  transform: translateX(-50%) translateY(6px);
+  max-width: 92%;
+  padding: 5px 10px;
+  background: #fff;
+  color: #222;
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 4;
+}
+#bubble.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* 말풍선 꼬리 */
+#bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #fff;
 }

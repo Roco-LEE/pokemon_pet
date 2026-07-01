@@ -1,13 +1,17 @@
-// 펫 렌더러: 상태머신(IDLE/WALK/DRAG) + 클릭 반응(REACT) + 포켓몬 전환.
+// 펫 렌더러: 상태머신(IDLE/WALK/DRAG/SLEEP) + 클릭 반응(REACT)
+// + 울음소리 + 말풍선 + 수면 모드 + 포켓몬 전환.
 
 const sprite = document.getElementById('sprite');
+const bubble = document.getElementById('bubble');
+const zzz = document.getElementById('zzz');
 
 const state = {
-  mode: 'idle', // 'idle' | 'walk' | 'drag'
+  mode: 'idle', // 'idle' | 'walk' | 'drag' | 'sleep'
   pos: { x: 0, y: 0 }, // 현재 창 좌상단(스크린 좌표)
   size: 192,
   workArea: { x: 0, y: 0, width: 1920, height: 1080 },
   spritesDir: '',
+  criesDir: '',
   pokemonId: 25,
   shiny: false,
   walkEnabled: true,
@@ -17,14 +21,49 @@ const state = {
   facingLeft: false,
   walkTarget: null,
   idleTimer: null,
-  walkRangeFraction: 0.15, // 산책 범위 = 우측 하단 가로폭의 이 비율
+  walkRangeFraction: 0.15, // 산책 범위 = 좌측 하단 가로폭의 이 비율
+  // 울음소리
+  soundEnabled: false,
+  // 말풍선
+  speechEnabled: true,
+  speechMin: 25,
+  speechMax: 60,
+  speechTimer: null,
+  bubbleTimer: null,
+  // 수면
+  sleepEnabled: true,
+  sleepIdleMinutes: 5,
+  nightStart: 22,
+  nightEnd: 7,
+  lastActivity: Date.now(),
+  sleepChecker: null,
+  // 낙하(중력) — 드래그해서 놓으면 바닥으로 떨어짐
+  vy: 0,
+  groundY: 0, // 바닥에 있을 때의 창 top y (스크린 좌표)
+  // 기상 직후 굼뜬(느린) 상태 종료 시각
+  grogEndAt: 0,
 };
 
-// 산책 가능한 좌우 경계(스크린 좌표). 우측 하단에서 가로폭 walkRangeFraction 만큼만.
+// 낙하 물리 상수
+const GRAVITY = 1.6; // 프레임당 가속(px)
+const MAX_FALL = 40; // 최대 낙하 속도(px/frame)
+
+// 기상 직후 둔화(굼뜸) 설정
+const GROG_MS = 4000; // 굼뜬 지속 시간
+const GROG_FACTOR = 0.4; // 이동 속도 배율(느리게)
+
+function effectiveWalkSpeed() {
+  return Date.now() < state.grogEndAt ? state.walkSpeed * GROG_FACTOR : state.walkSpeed;
+}
+
+// 산책 가능한 좌우 경계(스크린 좌표). 좌측 하단에서 가로폭 walkRangeFraction 만큼만.
 function walkBounds() {
-  const right = state.workArea.x + state.workArea.width - state.size;
+  const left = state.workArea.x;
   const band = state.workArea.width * state.walkRangeFraction;
-  const left = Math.max(state.workArea.x, right - band);
+  const right = Math.min(
+    state.workArea.x + state.workArea.width - state.size,
+    left + band
+  );
   return { minX: left, maxX: right };
 }
 
@@ -67,6 +106,118 @@ function react() {
   reactTimer = setTimeout(() => sprite.classList.remove('react'), 520);
 }
 
+// ---------- 울음소리 ----------
+let cryAudio = null;
+function playCry() {
+  if (!state.soundEnabled || !state.criesDir) return;
+  try {
+    const url = toFileUrl(`${state.criesDir}/${state.pokemonId}.ogg`);
+    if (cryAudio) {
+      cryAudio.pause();
+    }
+    cryAudio = new Audio(url);
+    cryAudio.volume = 0.45;
+    cryAudio.play().catch(() => {}); // 파일 없거나 자동재생 차단 시 무시
+  } catch {
+    /* noop */
+  }
+}
+
+// ---------- 말풍선 ----------
+const PHRASES = ['피카!', '반가워!', '놀자~', '심심해...', '뭐해?', '헤헤', '좋아!'];
+
+function timeComment() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return '좋은 아침!';
+  if (h >= 11 && h < 14) return '점심 먹었어?';
+  if (h >= 14 && h < 18) return '오후도 파이팅!';
+  if (h >= 18 && h < 22) return '오늘 하루 어땠어?';
+  return '늦었네, 안 자?';
+}
+
+function showBubble(text, ms = 3000) {
+  bubble.textContent = text;
+  bubble.classList.add('show');
+  clearTimeout(state.bubbleTimer);
+  state.bubbleTimer = setTimeout(() => bubble.classList.remove('show'), ms);
+}
+
+function hideBubble() {
+  clearTimeout(state.bubbleTimer);
+  bubble.classList.remove('show');
+}
+
+function scheduleNextSpeech() {
+  clearTimeout(state.speechTimer);
+  if (!state.speechEnabled) return;
+  const ms =
+    (state.speechMin + Math.random() * (state.speechMax - state.speechMin)) * 1000;
+  state.speechTimer = setTimeout(() => {
+    // 깨어 있을 때(idle/walk)만 말한다
+    if (state.mode === 'idle' || state.mode === 'walk') {
+      // 30% 확률로 시간 코멘트, 아니면 랜덤 한마디
+      const text =
+        Math.random() < 0.3
+          ? timeComment()
+          : PHRASES[Math.floor(Math.random() * PHRASES.length)];
+      showBubble(text);
+    }
+    scheduleNextSpeech();
+  }, ms);
+}
+
+// ---------- 수면 모드 ----------
+function isNight() {
+  const h = new Date().getHours();
+  const { nightStart, nightEnd } = state;
+  // 자정을 넘는 구간(예: 22~7) 처리
+  return nightStart <= nightEnd
+    ? h >= nightStart && h < nightEnd
+    : h >= nightStart || h < nightEnd;
+}
+
+function shouldSleep() {
+  if (!state.sleepEnabled) return false;
+  if (state.mode === 'drag' || state.mode === 'fall') return false;
+  if (isNight()) return true;
+  const idleMs = state.sleepIdleMinutes * 60 * 1000;
+  return Date.now() - state.lastActivity > idleMs;
+}
+
+function goSleep() {
+  if (state.mode === 'sleep') return;
+  clearTimeout(state.idleTimer);
+  clearTimeout(state.speechTimer);
+  state.walkTarget = null;
+  state.mode = 'sleep';
+  hideBubble();
+  sprite.classList.remove('react');
+  sprite.classList.add('sleeping');
+  zzz.classList.add('show');
+}
+
+let grogTimer = null;
+function wake() {
+  if (state.mode !== 'sleep') return;
+  state.mode = 'idle';
+  sprite.classList.remove('sleeping');
+  zzz.classList.remove('show');
+  // 기상 직후 잠깐 굼뜨게(느린 이동 + 느린 반응)
+  state.grogEndAt = Date.now() + GROG_MS;
+  sprite.classList.add('groggy');
+  clearTimeout(grogTimer);
+  grogTimer = setTimeout(() => sprite.classList.remove('groggy'), GROG_MS);
+  scheduleNextWalk();
+  scheduleNextSpeech();
+}
+
+// 사용자 상호작용 기록 → 유휴 타이머 리셋, 자고 있으면 깨우기.
+// (밤이어도 잠깐 깨어나며, 수면 체커가 다시 재우게 둔다)
+function markActivity() {
+  state.lastActivity = Date.now();
+  wake();
+}
+
 // ---------- IDLE → WALK 스케줄 ----------
 function scheduleNextWalk() {
   clearTimeout(state.idleTimer);
@@ -97,11 +248,37 @@ function stopWalk() {
   scheduleNextWalk();
 }
 
+// ---------- 낙하 시작(드롭) ----------
+function startFall() {
+  state.mode = 'fall';
+  state.vy = 0;
+  state.walkTarget = null;
+  clearTimeout(state.idleTimer);
+}
+
+function land() {
+  state.pos.y = state.groundY;
+  window.pet.moveTo(state.pos.x, state.pos.y);
+  state.vy = 0;
+  state.mode = 'idle';
+  react(); // 착지 통통
+  scheduleNextWalk();
+}
+
 // ---------- 메인 애니메이션 루프 ----------
 function tick() {
-  if (state.mode === 'walk' && state.walkTarget != null) {
+  if (state.mode === 'fall') {
+    state.vy = Math.min(MAX_FALL, state.vy + GRAVITY);
+    let ny = state.pos.y + state.vy;
+    if (ny >= state.groundY) {
+      land();
+    } else {
+      state.pos.y = ny;
+      window.pet.moveTo(state.pos.x, state.pos.y);
+    }
+  } else if (state.mode === 'walk' && state.walkTarget != null) {
     const dir = state.walkTarget > state.pos.x ? 1 : -1;
-    const step = state.walkSpeed * dir;
+    const step = effectiveWalkSpeed() * dir;
     let nx = state.pos.x + step;
     if (Math.abs(state.walkTarget - state.pos.x) <= Math.abs(step)) {
       nx = state.walkTarget;
@@ -126,6 +303,7 @@ const DRAG_THRESHOLD = 4;
 
 sprite.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return; // 좌클릭만
+  markActivity(); // 자고 있으면 깨우기
   down = {
     startX: e.screenX,
     startY: e.screenY,
@@ -147,6 +325,9 @@ window.addEventListener('mousemove', (e) => {
     state.mode = 'drag';
     state.walkTarget = null;
     document.body.classList.add('dragging');
+    // 들어올림 → 버둥거림
+    hideBubble();
+    sprite.classList.add('lifted');
   }
   if (down.moved) {
     state.pos.x = down.winX + dx;
@@ -160,12 +341,22 @@ window.addEventListener('mouseup', (e) => {
   const wasDrag = down.moved;
   down = null;
   document.body.classList.remove('dragging');
+  markActivity();
   if (wasDrag) {
-    state.mode = 'idle';
-    scheduleNextWalk();
+    // 놓음 → 버둥 멈추고 바닥으로 낙하
+    sprite.classList.remove('lifted');
+    if (state.pos.y < state.groundY) {
+      startFall(); // 공중이면 떨어뜨림 (tick이 착지 처리)
+    } else {
+      land(); // 이미 바닥/그 아래면 즉시 착지
+    }
   } else {
-    // 이동 없으면 클릭 → 반응
+    // 이동 없으면 클릭 → 반응 + 울음소리 + 가끔 한마디
     react();
+    playCry();
+    if (state.speechEnabled && Math.random() < 0.5) {
+      showBubble(PHRASES[Math.floor(Math.random() * PHRASES.length)], 2000);
+    }
     scheduleNextWalk();
   }
 });
@@ -186,27 +377,68 @@ window.pet.onWalkToggle((enabled) => {
     if (state.mode === 'walk') stopWalk();
   }
 });
+window.pet.onSoundToggle((enabled) => {
+  state.soundEnabled = enabled;
+});
+window.pet.onSpeechToggle((enabled) => {
+  state.speechEnabled = enabled;
+  if (enabled) scheduleNextSpeech();
+  else {
+    clearTimeout(state.speechTimer);
+    hideBubble();
+  }
+});
+window.pet.onSleepToggle((enabled) => {
+  state.sleepEnabled = enabled;
+  if (!enabled && state.mode === 'sleep') wake();
+});
 
 // ---------- 초기화 ----------
 async function init() {
   const data = await window.pet.getInit();
+  const cfg = data.config;
   state.spritesDir = data.spritesDir;
+  state.criesDir = data.criesDir || '';
   state.pokemonId = data.pokemonId;
-  state.shiny = data.config.shiny;
-  state.walkEnabled = data.config.walk.enabled;
-  state.walkSpeed = data.config.walk.speed || 1.0;
-  state.walkMin = data.config.walk.minIntervalSec;
-  state.walkMax = data.config.walk.maxIntervalSec;
-  if (typeof data.config.walk.rangeFraction === 'number') {
-    state.walkRangeFraction = data.config.walk.rangeFraction;
+  state.shiny = cfg.shiny;
+  state.walkEnabled = cfg.walk.enabled;
+  state.walkSpeed = cfg.walk.speed || 1.0;
+  state.walkMin = cfg.walk.minIntervalSec;
+  state.walkMax = cfg.walk.maxIntervalSec;
+  if (typeof cfg.walk.rangeFraction === 'number') {
+    state.walkRangeFraction = cfg.walk.rangeFraction;
+  }
+  // 울음소리 / 말풍선 / 수면 설정
+  if (cfg.sound) state.soundEnabled = !!cfg.sound.enabled;
+  if (cfg.speech) {
+    state.speechEnabled = cfg.speech.enabled !== false;
+    if (typeof cfg.speech.minIntervalSec === 'number') state.speechMin = cfg.speech.minIntervalSec;
+    if (typeof cfg.speech.maxIntervalSec === 'number') state.speechMax = cfg.speech.maxIntervalSec;
+  }
+  if (cfg.sleep) {
+    state.sleepEnabled = cfg.sleep.enabled !== false;
+    if (typeof cfg.sleep.idleMinutes === 'number') state.sleepIdleMinutes = cfg.sleep.idleMinutes;
+    if (typeof cfg.sleep.nightStart === 'number') state.nightStart = cfg.sleep.nightStart;
+    if (typeof cfg.sleep.nightEnd === 'number') state.nightEnd = cfg.sleep.nightEnd;
   }
   state.workArea = data.workArea;
   if (data.bounds) {
     state.pos = { x: data.bounds.x, y: data.bounds.y };
     state.size = data.bounds.width;
+    state.groundY = data.bounds.y; // 시작 위치 = 바닥
+  }
+  // 스프라이트를 창 안에서 footprint 크기(하단 중앙)로 그리도록 CSS 변수 설정
+  if (data.petFootprint) {
+    document.documentElement.style.setProperty('--pet', `${data.petFootprint}px`);
   }
   setPokemon(state.pokemonId, state.shiny);
+  state.lastActivity = Date.now();
   scheduleNextWalk();
+  scheduleNextSpeech();
+  // 수면 조건 주기적 확인(유휴/야간)
+  state.sleepChecker = setInterval(() => {
+    if (state.mode !== 'sleep' && shouldSleep()) goSleep();
+  }, 15000);
   requestAnimationFrame(tick);
 }
 
