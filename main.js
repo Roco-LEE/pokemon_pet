@@ -33,6 +33,9 @@ const POKEMON = [
   { id: 133, ko: '이브이' },
 ];
 
+// 랜덤 뽑기에서 이로치가 나올 확률 (1/16)
+const SHINY_CHANCE = 1 / 16;
+
 let win = null;
 let config = { ...DEFAULT_CONFIG };
 
@@ -144,35 +147,34 @@ function currentWorkArea() {
   return d.workArea;
 }
 
+// 포켓몬 교체. 랜덤 뽑기일 때만 이로치가 나올 수 있다.
+function applyPokemon(id, shiny, announce = false) {
+  config.currentPokemonId = id;
+  config.shiny = !!shiny;
+  saveConfig();
+  win && win.webContents.send('set-pokemon', { id, shiny: config.shiny, announce });
+}
+
+function drawRandomPokemon() {
+  const pool = POKEMON.filter((p) => p.id !== config.currentPokemonId);
+  const list = pool.length ? pool : POKEMON;
+  const pick = list[Math.floor(Math.random() * list.length)];
+  applyPokemon(pick.id, Math.random() < SHINY_CHANCE, true);
+}
+
 function buildContextMenu() {
   const items = POKEMON.map((p) => ({
     label: p.ko,
     type: 'radio',
     checked: config.currentPokemonId === p.id,
-    click: () => {
-      config.currentPokemonId = p.id;
-      saveConfig();
-      win && win.webContents.send('set-pokemon', { id: p.id, shiny: config.shiny });
-    },
+    // 직접 고르면 항상 일반 스프라이트 (이로치는 랜덤 뽑기 전용)
+    click: () => applyPokemon(p.id, false),
   }));
 
   return Menu.buildFromTemplate([
     ...items,
     { type: 'separator' },
-    {
-      label: '이로치 토글',
-      type: 'checkbox',
-      checked: config.shiny,
-      click: () => {
-        config.shiny = !config.shiny;
-        saveConfig();
-        win &&
-          win.webContents.send('set-pokemon', {
-            id: config.currentPokemonId,
-            shiny: config.shiny,
-          });
-      },
-    },
+    { label: '랜덤 뽑기 🎲', click: () => drawRandomPokemon() },
     {
       label: '산책 켜기/끄기',
       type: 'checkbox',

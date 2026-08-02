@@ -33,11 +33,82 @@ body {
   pointer-events: auto;
   transform-origin: center bottom;
   transition: transform 0.05s linear;
+  position: relative;
+  z-index: 1; /* 그림자 위 */
 }
 
 /* 진행 방향에 따라 좌우 반전 */
 #sprite.flip {
   transform: scaleX(-1);
+}
+
+/* ---------- 바닥 그림자 ---------- */
+#shadow {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--pet, 100px) * 0.015);
+  width: calc(var(--pet, 100px) * 0.5);
+  height: calc(var(--pet, 100px) * 0.13);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.42) 0%,
+    rgba(0, 0, 0, 0.26) 55%,
+    rgba(0, 0, 0, 0) 72%
+  );
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 0;
+}
+/* 공중(드래그/낙하)에서는 발밑 그림자가 없다 */
+body.airborne #shadow {
+  opacity: 0 !important; /* 보행 애니메이션의 opacity보다 우선 */
+}
+/* 잘 때는 옅게 */
+body.resting #shadow {
+  opacity: 0.7 !important;
+}
+
+/* ---------- 보행 모션 (걷기 전용 스프라이트 대체) ---------- */
+/* 좌우반전은 flip이 담당, 여기서는 위아래 bobbing으로 걷는 티를 낸다 */
+#sprite.walking {
+  animation: bob 0.44s ease-in-out infinite;
+}
+#sprite.walking.flip {
+  animation: bob-flip 0.44s ease-in-out infinite;
+}
+/* 발이 뜬 만큼 그림자도 살짝 작아진다 */
+#shadow.walking {
+  animation: shadow-bob 0.44s ease-in-out infinite;
+}
+/* 기상 직후에는 걸음도 굼뜨게 */
+#sprite.groggy.walking,
+#sprite.groggy.walking.flip,
+#shadow.groggy.walking {
+  animation-duration: 0.8s;
+}
+
+@keyframes bob {
+  0%   { transform: translateY(0) scale(1, 1); }
+  25%  { transform: translateY(-5%) scale(0.99, 1.02); }
+  50%  { transform: translateY(0) scale(1.01, 0.99); }
+  75%  { transform: translateY(-5%) scale(0.99, 1.02); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes bob-flip {
+  0%   { transform: scaleX(-1) translateY(0) scale(1, 1); }
+  25%  { transform: scaleX(-1) translateY(-5%) scale(0.99, 1.02); }
+  50%  { transform: scaleX(-1) translateY(0) scale(1.01, 0.99); }
+  75%  { transform: scaleX(-1) translateY(-5%) scale(0.99, 1.02); }
+  100% { transform: scaleX(-1) translateY(0) scale(1, 1); }
+}
+@keyframes shadow-bob {
+  0%   { transform: translateX(-50%) scale(1); opacity: 1; }
+  25%  { transform: translateX(-50%) scale(0.86); opacity: 0.78; }
+  50%  { transform: translateX(-50%) scale(1); opacity: 1; }
+  75%  { transform: translateX(-50%) scale(0.86); opacity: 0.78; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
 }
 
 /* 클릭 반응(REACT) — 통통 튀기 */

@@ -8,6 +8,9 @@ dist/
 assets/sprites/
 assets/cries/
 
+# 개인 메모
+아이디어.txt
+
 # 로그/캐시
 *.log
 npm-debug.log*

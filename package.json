@@ -1,6 +1,6 @@
 {
   "name": "pokemon-desktop-pet",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "로컬 전용 포켓몬 데스크탑 펫 (좌측 모니터 좌하단)",
   "main": "main.js",
   "scripts": {

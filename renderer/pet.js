@@ -2,6 +2,7 @@
 // + 울음소리 + 말풍선 + 수면 모드 + 포켓몬 전환.
 
 const sprite = document.getElementById('sprite');
+const shadow = document.getElementById('shadow');
 const bubble = document.getElementById('bubble');
 const zzz = document.getElementById('zzz');
 
@@ -95,6 +96,19 @@ function applyFacing() {
   sprite.classList.toggle('flip', state.facingLeft);
 }
 
+// 현재 모드에 맞춰 보행 bobbing / 바닥 그림자 상태를 동기화
+function applyMotion() {
+  const walking = state.mode === 'walk';
+  sprite.classList.toggle('walking', walking);
+  shadow.classList.toggle('walking', walking);
+  // 공중(드래그/낙하)에서는 발밑 그림자를 숨긴다
+  document.body.classList.toggle(
+    'airborne',
+    state.mode === 'drag' || state.mode === 'fall'
+  );
+  document.body.classList.toggle('resting', state.mode === 'sleep');
+}
+
 // ---------- REACT (클릭 반응) ----------
 let reactTimer = null;
 function react() {
@@ -124,7 +138,25 @@ function playCry() {
 }
 
 // ---------- 말풍선 ----------
-const PHRASES = ['피카!', '반가워!', '놀자~', '심심해...', '뭐해?', '헤헤', '좋아!'];
+// 공용 한마디 + 포켓몬별 울음소리 대사
+const COMMON_PHRASES = ['반가워!', '놀자~', '심심해...', '뭐해?', '헤헤', '좋아!'];
+const CRY_PHRASES = {
+  1: ['이상~', '씨!씨!'],
+  4: ['파이~', '파이리!'],
+  7: ['꼬북꼬북!', '꼬북~'],
+  25: ['피카!', '피카츄!'],
+  132: ['메타몽?', '몽...'],
+  133: ['이브이~'],
+};
+
+function phrases() {
+  return [...(CRY_PHRASES[state.pokemonId] || []), ...COMMON_PHRASES];
+}
+
+function randomPhrase() {
+  const list = phrases();
+  return list[Math.floor(Math.random() * list.length)];
+}
 
 function timeComment() {
   const h = new Date().getHours();
@@ -159,7 +191,7 @@ function scheduleNextSpeech() {
       const text =
         Math.random() < 0.3
           ? timeComment()
-          : PHRASES[Math.floor(Math.random() * PHRASES.length)];
+          : randomPhrase();
       showBubble(text);
     }
     scheduleNextSpeech();
@@ -190,6 +222,7 @@ function goSleep() {
   clearTimeout(state.speechTimer);
   state.walkTarget = null;
   state.mode = 'sleep';
+  applyMotion();
   hideBubble();
   sprite.classList.remove('react');
   sprite.classList.add('sleeping');
@@ -200,13 +233,18 @@ let grogTimer = null;
 function wake() {
   if (state.mode !== 'sleep') return;
   state.mode = 'idle';
+  applyMotion();
   sprite.classList.remove('sleeping');
   zzz.classList.remove('show');
-  // 기상 직후 잠깐 굼뜨게(느린 이동 + 느린 반응)
+  // 기상 직후 잠깐 굼뜨게(느린 이동 + 느린 반응 + 느린 걸음)
   state.grogEndAt = Date.now() + GROG_MS;
   sprite.classList.add('groggy');
+  shadow.classList.add('groggy');
   clearTimeout(grogTimer);
-  grogTimer = setTimeout(() => sprite.classList.remove('groggy'), GROG_MS);
+  grogTimer = setTimeout(() => {
+    sprite.classList.remove('groggy');
+    shadow.classList.remove('groggy');
+  }, GROG_MS);
   scheduleNextWalk();
   scheduleNextSpeech();
 }
@@ -231,20 +269,35 @@ function scheduleNextWalk() {
 
 function startWalk() {
   const { minX, maxX } = walkBounds();
-  // 현재 위치에서 충분히 떨어진 임의 목표
-  let target;
-  do {
-    target = minX + Math.random() * (maxX - minX);
-  } while (Math.abs(target - state.pos.x) < state.size * 0.5 && maxX > minX);
+  if (maxX <= minX) return; // 산책할 공간이 없음
+  // 현재 위치에서 충분히 떨어진 임의 목표.
+  // 산책 범위가 좁으면 조건을 만족하는 지점이 아예 없을 수 있으므로 시도 횟수를 제한한다.
+  // (무한 재추첨 시 렌더러가 통째로 멈춤)
+  const minDist = Math.min(state.size * 0.5, (maxX - minX) * 0.5);
+  let target = null;
+  for (let i = 0; i < 12; i++) {
+    const t = minX + Math.random() * (maxX - minX);
+    if (Math.abs(t - state.pos.x) >= minDist) {
+      target = t;
+      break;
+    }
+  }
+  // 실패하면 현재 위치에서 더 먼 쪽 끝으로
+  if (target == null) {
+    target =
+      Math.abs(minX - state.pos.x) > Math.abs(maxX - state.pos.x) ? minX : maxX;
+  }
   state.walkTarget = target;
   state.facingLeft = target < state.pos.x;
   applyFacing();
   state.mode = 'walk';
+  applyMotion();
 }
 
 function stopWalk() {
   state.walkTarget = null;
   state.mode = 'idle';
+  applyMotion();
   scheduleNextWalk();
 }
 
@@ -254,6 +307,7 @@ function startFall() {
   state.vy = 0;
   state.walkTarget = null;
   clearTimeout(state.idleTimer);
+  applyMotion();
 }
 
 function land() {
@@ -261,6 +315,7 @@ function land() {
   window.pet.moveTo(state.pos.x, state.pos.y);
   state.vy = 0;
   state.mode = 'idle';
+  applyMotion();
   react(); // 착지 통통
   scheduleNextWalk();
 }
@@ -324,6 +379,7 @@ window.addEventListener('mousemove', (e) => {
     down.moved = true;
     state.mode = 'drag';
     state.walkTarget = null;
+    applyMotion();
     document.body.classList.add('dragging');
     // 들어올림 → 버둥거림
     hideBubble();
@@ -351,11 +407,16 @@ window.addEventListener('mouseup', (e) => {
       land(); // 이미 바닥/그 아래면 즉시 착지
     }
   } else {
-    // 이동 없으면 클릭 → 반응 + 울음소리 + 가끔 한마디
+    // 이동 없으면 클릭 → 걸음 멈추고 반응 + 울음소리 + 가끔 한마디
+    if (state.mode === 'walk') {
+      state.walkTarget = null;
+      state.mode = 'idle';
+      applyMotion();
+    }
     react();
     playCry();
     if (state.speechEnabled && Math.random() < 0.5) {
-      showBubble(PHRASES[Math.floor(Math.random() * PHRASES.length)], 2000);
+      showBubble(randomPhrase(), 2000);
     }
     scheduleNextWalk();
   }
@@ -368,7 +429,15 @@ window.addEventListener('contextmenu', (e) => {
 });
 
 // ---------- 메인 프로세스 이벤트 ----------
-window.pet.onSetPokemon(({ id, shiny }) => setPokemon(id, shiny));
+window.pet.onSetPokemon(({ id, shiny, announce }) => {
+  setPokemon(id, shiny);
+  react();
+  playCry();
+  // 랜덤 뽑기로 이로치가 나오면 축하 한마디
+  if (announce && shiny && state.speechEnabled) {
+    showBubble('✨ 이로치다! ✨', 4000);
+  }
+});
 window.pet.onWalkToggle((enabled) => {
   state.walkEnabled = enabled;
   if (enabled) scheduleNextWalk();
@@ -432,6 +501,7 @@ async function init() {
     document.documentElement.style.setProperty('--pet', `${data.petFootprint}px`);
   }
   setPokemon(state.pokemonId, state.shiny);
+  applyMotion();
   state.lastActivity = Date.now();
   scheduleNextWalk();
   scheduleNextSpeech();
