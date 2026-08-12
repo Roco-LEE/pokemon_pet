@@ -132,6 +132,33 @@ body.resting #shadow {
   100% { transform: scaleX(-1) translateY(0) scale(1); }
 }
 
+/* ---------- 알림 반응(NOTICE) — 깜짝 놀라 그쪽을 쳐다보기 ---------- */
+/* 짧게 움찔한 뒤 살짝 앞으로 기울여 주시하는 자세를 유지한다 */
+#sprite.notice {
+  animation: notice 2.4s ease-out;
+}
+#sprite.notice.flip {
+  animation: notice-flip 2.4s ease-out;
+}
+@keyframes notice {
+  0%   { transform: translateY(0) scale(1); }
+  10%  { transform: translateY(-14%) scale(1.06, 0.96); }
+  22%  { transform: translateY(0) scale(0.97, 1.04); }
+  32%  { transform: translateY(0) rotate(-6deg); }
+  45%  { transform: translateY(0) rotate(4deg); }
+  60%  { transform: translateY(0) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes notice-flip {
+  0%   { transform: scaleX(-1) translateY(0) scale(1); }
+  10%  { transform: scaleX(-1) translateY(-14%) scale(1.06, 0.96); }
+  22%  { transform: scaleX(-1) translateY(0) scale(0.97, 1.04); }
+  32%  { transform: scaleX(-1) translateY(0) rotate(-6deg); }
+  45%  { transform: scaleX(-1) translateY(0) rotate(4deg); }
+  60%  { transform: scaleX(-1) translateY(0) rotate(-3deg); }
+  100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+}
+
 /* 드래그 중 커서 */
 body.dragging {
   cursor: grabbing;

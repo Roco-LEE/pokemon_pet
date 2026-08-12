@@ -22,9 +22,12 @@ const state = {
   facingLeft: false,
   walkTarget: null,
   idleTimer: null,
-  walkRangeFraction: 0.15, // 산책 범위 = 좌측 하단 가로폭의 이 비율
+  walkWidths: 3, // 산책 범위 = 펫 너비의 이 배수 (화면 비율에 종속되지 않게)
+  anchorSide: 'left', // 산책 띠를 작업영역의 어느 쪽에 붙일지
   // 울음소리
   soundEnabled: false,
+  // 알림/시스템 이벤트 반응
+  notifyEnabled: true,
   // 말풍선
   speechEnabled: true,
   speechMin: 25,
@@ -57,15 +60,17 @@ function effectiveWalkSpeed() {
   return Date.now() < state.grogEndAt ? state.walkSpeed * GROG_FACTOR : state.walkSpeed;
 }
 
-// 산책 가능한 좌우 경계(스크린 좌표). 좌측 하단에서 가로폭 walkRangeFraction 만큼만.
+// 산책 가능한 좌우 경계(스크린 좌표).
+// 범위를 "화면 가로폭의 비율"이 아니라 "펫 너비의 배수"로 잡아 세로 모니터에서도 일정하게 유지한다.
 function walkBounds() {
-  const left = state.workArea.x;
-  const band = state.workArea.width * state.walkRangeFraction;
-  const right = Math.min(
-    state.workArea.x + state.workArea.width - state.size,
-    left + band
-  );
-  return { minX: left, maxX: right };
+  const wa = state.workArea;
+  const fullMin = wa.x;
+  const fullMax = wa.x + wa.width - state.size;
+  if (fullMax <= fullMin) return { minX: fullMin, maxX: fullMin }; // 화면보다 펫이 큼
+  const band = state.size * state.walkWidths;
+  return state.anchorSide === 'right'
+    ? { minX: Math.max(fullMin, fullMax - band), maxX: fullMax }
+    : { minX: fullMin, maxX: Math.min(fullMax, fullMin + band) };
 }
 
 // 윈도우 경로 → file:// URL
@@ -256,6 +261,53 @@ function markActivity() {
   wake();
 }
 
+// ---------- 알림 / 시스템 이벤트 반응 ----------
+// 메인이 윈도우 토스트 알림·잠금해제·절전복귀를 감지해 보내준다.
+// 펫은 하던 걸 멈추고 알림이 뜬 쪽을 쳐다본다.
+const NOTICE_MS = 2400;
+const NOTICE_LINES = {
+  notification: ['앗!', '알림 왔어!', '뭐지?', '저기 봐!'],
+  unlock: ['왔구나!', '어서 와!'],
+  resume: ['잘 잤어?', '다시 왔네!'],
+  appear: ['짜잔!', '나 왔어~'],
+};
+
+let noticeTimer = null;
+function noticeEvent({ kind, direction }) {
+  if (state.mode === 'drag' || down) return; // 들고 있는 중엔 방해하지 않는다
+
+  if (kind === 'notification') {
+    if (!state.notifyEnabled) return;
+    if (state.mode === 'sleep') return; // 자는 애를 알림마다 깨우지는 않는다
+  } else {
+    // 등장·잠금해제·절전복귀는 "사람이 돌아왔다"는 신호 → 깨어난다
+    markActivity();
+  }
+
+  if (state.mode === 'walk') {
+    state.walkTarget = null;
+    state.mode = 'idle';
+    applyMotion();
+    scheduleNextWalk();
+  }
+
+  if (direction) {
+    state.facingLeft = direction === 'left';
+    applyFacing();
+  }
+
+  sprite.classList.remove('notice');
+  void sprite.offsetWidth; // 리플로우로 애니메이션 재시작
+  sprite.classList.add('notice');
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => sprite.classList.remove('notice'), NOTICE_MS);
+
+  if (state.speechEnabled) {
+    const lines = NOTICE_LINES[kind] || NOTICE_LINES.notification;
+    showBubble(lines[Math.floor(Math.random() * lines.length)], 2200);
+  }
+}
+
 // ---------- IDLE → WALK 스케줄 ----------
 function scheduleNextWalk() {
   clearTimeout(state.idleTimer);
@@ -392,7 +444,7 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-window.addEventListener('mouseup', (e) => {
+window.addEventListener('mouseup', async (e) => {
   if (!down) return;
   const wasDrag = down.moved;
   down = null;
@@ -401,6 +453,8 @@ window.addEventListener('mouseup', (e) => {
   if (wasDrag) {
     // 놓음 → 버둥 멈추고 바닥으로 낙하
     sprite.classList.remove('lifted');
+    // 다른 모니터에 내려놨을 수 있다 → 그 모니터 기준으로 바닥/산책 범위를 다시 받는다
+    applyGeometry(await window.pet.getGeometry());
     if (state.pos.y < state.groundY) {
       startFall(); // 공중이면 떨어뜨림 (tick이 착지 처리)
     } else {
@@ -428,6 +482,36 @@ window.addEventListener('contextmenu', (e) => {
   window.pet.showContextMenu();
 });
 
+// ---------- 지오메트리 동기화 ----------
+// 모니터 구성이 바뀌거나 펫을 다른 모니터로 옮기면 workArea/groundY가 통째로 달라진다.
+// 갱신하지 않으면 렌더러가 옛 좌표를 믿고 펫을 예전 자리로 되돌린다.
+function applyGeometry(g) {
+  if (!g) return;
+  if (g.workArea) state.workArea = g.workArea;
+  if (typeof g.groundY === 'number') state.groundY = g.groundY;
+  if (g.anchorSide) state.anchorSide = g.anchorSide;
+  if (g.bounds) {
+    state.pos = { x: g.bounds.x, y: g.bounds.y };
+    state.size = g.bounds.width;
+  }
+  // 크기 설정을 바꾸면 창과 함께 스프라이트 표시 크기(--pet)도 갱신된다
+  if (g.petFootprint) {
+    document.documentElement.style.setProperty('--pet', `${g.petFootprint}px`);
+  }
+}
+
+window.pet.onGeometryChanged((g) => {
+  applyGeometry(g);
+  // 사라진 모니터를 향하던 목적지는 폐기하고 처음부터
+  state.walkTarget = null;
+  if (state.mode === 'walk' || state.mode === 'fall') {
+    state.mode = 'idle';
+    state.vy = 0;
+    applyMotion();
+    scheduleNextWalk();
+  }
+});
+
 // ---------- 메인 프로세스 이벤트 ----------
 window.pet.onSetPokemon(({ id, shiny, announce }) => {
   setPokemon(id, shiny);
@@ -438,29 +522,66 @@ window.pet.onSetPokemon(({ id, shiny, announce }) => {
     showBubble('✨ 이로치다! ✨', 4000);
   }
 });
-window.pet.onWalkToggle((enabled) => {
-  state.walkEnabled = enabled;
-  if (enabled) scheduleNextWalk();
-  else {
-    clearTimeout(state.idleTimer);
-    if (state.mode === 'walk') stopWalk();
+window.pet.onPetEvent((data) => noticeEvent(data || {}));
+
+// 설정은 트레이·우클릭 메뉴·설정 창 어디서든 바뀔 수 있다 → 항상 전체 설정을 다시 반영한다.
+window.pet.onConfigChanged((cfg) => applyConfig(cfg));
+
+// ---------- 설정 반영 ----------
+// 초기화와 실시간 변경이 같은 경로를 쓴다(설정 창 슬라이더를 움직이면 즉시 반영).
+function applyConfig(cfg) {
+  if (!cfg) return;
+
+  if (cfg.walk) {
+    const wasEnabled = state.walkEnabled;
+    state.walkEnabled = cfg.walk.enabled !== false;
+    if (typeof cfg.walk.speed === 'number') state.walkSpeed = cfg.walk.speed;
+    if (typeof cfg.walk.minIntervalSec === 'number') state.walkMin = cfg.walk.minIntervalSec;
+    if (typeof cfg.walk.maxIntervalSec === 'number') state.walkMax = cfg.walk.maxIntervalSec;
+    if (typeof cfg.walk.widths === 'number' && cfg.walk.widths > 0) {
+      state.walkWidths = cfg.walk.widths;
+    }
+    if (state.walkEnabled && !wasEnabled) {
+      scheduleNextWalk();
+    } else if (!state.walkEnabled) {
+      clearTimeout(state.idleTimer);
+      if (state.mode === 'walk') stopWalk();
+    }
   }
-});
-window.pet.onSoundToggle((enabled) => {
-  state.soundEnabled = enabled;
-});
-window.pet.onSpeechToggle((enabled) => {
-  state.speechEnabled = enabled;
-  if (enabled) scheduleNextSpeech();
-  else {
-    clearTimeout(state.speechTimer);
-    hideBubble();
+
+  if (cfg.sound) state.soundEnabled = !!cfg.sound.enabled;
+
+  if (cfg.speech) {
+    const wasEnabled = state.speechEnabled;
+    state.speechEnabled = cfg.speech.enabled !== false;
+    if (typeof cfg.speech.minIntervalSec === 'number') state.speechMin = cfg.speech.minIntervalSec;
+    if (typeof cfg.speech.maxIntervalSec === 'number') state.speechMax = cfg.speech.maxIntervalSec;
+    if (state.speechEnabled) {
+      if (!wasEnabled) scheduleNextSpeech();
+    } else {
+      clearTimeout(state.speechTimer);
+      hideBubble();
+    }
   }
-});
-window.pet.onSleepToggle((enabled) => {
-  state.sleepEnabled = enabled;
-  if (!enabled && state.mode === 'sleep') wake();
-});
+
+  if (cfg.sleep) {
+    state.sleepEnabled = cfg.sleep.enabled !== false;
+    if (typeof cfg.sleep.idleMinutes === 'number') state.sleepIdleMinutes = cfg.sleep.idleMinutes;
+    if (typeof cfg.sleep.nightStart === 'number') state.nightStart = cfg.sleep.nightStart;
+    if (typeof cfg.sleep.nightEnd === 'number') state.nightEnd = cfg.sleep.nightEnd;
+    if (!state.sleepEnabled && state.mode === 'sleep') wake();
+  }
+
+  if (cfg.notify) state.notifyEnabled = cfg.notify.enabled !== false;
+
+  // 설정 창에서 포켓몬을 바꿨을 때 (set-pokemon 이벤트로 이미 바뀌었으면 아무 일도 하지 않는다)
+  if (
+    typeof cfg.currentPokemonId === 'number' &&
+    (cfg.currentPokemonId !== state.pokemonId || !!cfg.shiny !== state.shiny)
+  ) {
+    setPokemon(cfg.currentPokemonId, cfg.shiny);
+  }
+}
 
 // ---------- 초기화 ----------
 async function init() {
@@ -470,36 +591,10 @@ async function init() {
   state.criesDir = data.criesDir || '';
   state.pokemonId = data.pokemonId;
   state.shiny = cfg.shiny;
-  state.walkEnabled = cfg.walk.enabled;
-  state.walkSpeed = cfg.walk.speed || 1.0;
-  state.walkMin = cfg.walk.minIntervalSec;
-  state.walkMax = cfg.walk.maxIntervalSec;
-  if (typeof cfg.walk.rangeFraction === 'number') {
-    state.walkRangeFraction = cfg.walk.rangeFraction;
-  }
-  // 울음소리 / 말풍선 / 수면 설정
-  if (cfg.sound) state.soundEnabled = !!cfg.sound.enabled;
-  if (cfg.speech) {
-    state.speechEnabled = cfg.speech.enabled !== false;
-    if (typeof cfg.speech.minIntervalSec === 'number') state.speechMin = cfg.speech.minIntervalSec;
-    if (typeof cfg.speech.maxIntervalSec === 'number') state.speechMax = cfg.speech.maxIntervalSec;
-  }
-  if (cfg.sleep) {
-    state.sleepEnabled = cfg.sleep.enabled !== false;
-    if (typeof cfg.sleep.idleMinutes === 'number') state.sleepIdleMinutes = cfg.sleep.idleMinutes;
-    if (typeof cfg.sleep.nightStart === 'number') state.nightStart = cfg.sleep.nightStart;
-    if (typeof cfg.sleep.nightEnd === 'number') state.nightEnd = cfg.sleep.nightEnd;
-  }
-  state.workArea = data.workArea;
-  if (data.bounds) {
-    state.pos = { x: data.bounds.x, y: data.bounds.y };
-    state.size = data.bounds.width;
-    state.groundY = data.bounds.y; // 시작 위치 = 바닥
-  }
-  // 스프라이트를 창 안에서 footprint 크기(하단 중앙)로 그리도록 CSS 변수 설정
-  if (data.petFootprint) {
-    document.documentElement.style.setProperty('--pet', `${data.petFootprint}px`);
-  }
+  // 산책·울음소리·말풍선·수면·알림 설정 (실시간 변경과 동일한 경로)
+  applyConfig(cfg);
+  // workArea / bounds / groundY / anchorSide / footprint 를 한 번에 반영 (이후 geometry-changed로 갱신)
+  applyGeometry(data);
   setPokemon(state.pokemonId, state.shiny);
   applyMotion();
   state.lastActivity = Date.now();

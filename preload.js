@@ -1,4 +1,5 @@
 // 렌더러 ↔ 메인 안전한 브리지 (contextIsolation).
+// 펫 창과 설정 창이 같은 preload를 공유한다 (window.pet / window.petSettings).
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -14,12 +15,29 @@ contextBridge.exposeInMainWorld('pet', {
 
   // 메뉴 / 종료
   showContextMenu: () => ipcRenderer.send('show-context-menu'),
+  openSettings: () => ipcRenderer.send('open-settings'),
   quit: () => ipcRenderer.send('quit'),
 
   // 메인 → 렌더러 이벤트 구독
+  onGeometryChanged: (cb) => ipcRenderer.on('geometry-changed', (_e, data) => cb(data)),
   onSetPokemon: (cb) => ipcRenderer.on('set-pokemon', (_e, data) => cb(data)),
-  onWalkToggle: (cb) => ipcRenderer.on('walk-toggle', (_e, enabled) => cb(enabled)),
-  onSoundToggle: (cb) => ipcRenderer.on('sound-toggle', (_e, enabled) => cb(enabled)),
-  onSpeechToggle: (cb) => ipcRenderer.on('speech-toggle', (_e, enabled) => cb(enabled)),
-  onSleepToggle: (cb) => ipcRenderer.on('sleep-toggle', (_e, enabled) => cb(enabled)),
+  // 설정 변경 방송 (트레이·우클릭 메뉴·설정 창 어디서 바꾸든 여기로 온다)
+  onConfigChanged: (cb) => ipcRenderer.on('config-changed', (_e, cfg) => cb(cfg)),
+  // 알림/시스템 이벤트 (펫이 그쪽을 쳐다본다)
+  onPetEvent: (cb) => ipcRenderer.on('pet-event', (_e, data) => cb(data)),
+});
+
+contextBridge.exposeInMainWorld('petSettings', {
+  init: () => ipcRenderer.invoke('settings-init'),
+  set: (patch) => ipcRenderer.send('set-config', patch),
+  pick: (id) => ipcRenderer.send('pick-pokemon', id),
+  drawRandom: () => ipcRenderer.send('draw-random'),
+  setVisible: (visible) => ipcRenderer.send('set-pet-visible', visible),
+  resetPosition: () => ipcRenderer.send('reset-position'),
+  close: () => ipcRenderer.send('close-settings'),
+  onConfigChanged: (cb) => ipcRenderer.on('config-changed', (_e, cfg) => cb(cfg)),
+  // 트레이에서 숨기기/보이기를 눌러도 설정 창의 체크박스가 따라오도록
+  onVisibilityChanged: (cb) => ipcRenderer.on('visibility-changed', (_e, v) => cb(v)),
+  // 모니터를 켜고 끄거나 해상도를 바꾸면 목록·배치도를 다시 그린다
+  onDisplaysChanged: (cb) => ipcRenderer.on('displays-changed', (_e, list) => cb(list)),
 });

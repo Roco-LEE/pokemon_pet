@@ -1,0 +1,238 @@
+/* 설정 창 — 다크 카드 UI. 펫 창(투명 오버레이)과는 완전히 별개의 스타일. */
+
+:root {
+  --bg: #1d2027;
+  --card: #262a33;
+  --line: #343a46;
+  --text: #e8ebf1;
+  --muted: #9aa3b2;
+  --accent: #ee1515; /* 몬스터볼 빨강 */
+  --accent-soft: #ff4d4d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 13px;
+  user-select: none;
+  cursor: default;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #22262f 0%, rgba(34, 38, 47, 0.92) 100%);
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+main {
+  padding: 12px 16px 4px;
+}
+
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* 라벨 + 컨트롤 + 값 한 줄 */
+.row {
+  display: grid;
+  grid-template-columns: 88px 1fr 52px;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.row > span {
+  color: var(--muted);
+}
+
+.row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* 체크박스 행은 컨트롤이 앞에 오고 라벨이 늘어난다 */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.switch.row {
+  grid-template-columns: auto 1fr;
+}
+.switch span {
+  color: var(--text);
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+select {
+  width: 100%;
+  padding: 5px 8px;
+  background: #1b1e25;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.row select {
+  grid-column: 2 / span 2;
+}
+
+button {
+  padding: 7px 10px;
+  background: #30353f;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover {
+  background: #3a404c;
+}
+button.wide {
+  width: 100%;
+  margin-top: 8px;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+button.primary:hover {
+  background: var(--accent-soft);
+}
+
+/* 포켓몬 선택 그리드 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.grid button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---------- 모니터 배치도 ---------- */
+/* 실제 모니터 배치를 축소해 그린다. 세로 모니터·해상도 차이가 눈에 보이도록 비율 그대로. */
+.map {
+  position: relative;
+  width: 100%;
+  margin: 10px 0 0;
+  background: #171a20;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.map .mon {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
+  background: #2f343e;
+  border: 1px solid #454c5a;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow: hidden;
+  text-align: center;
+}
+.map .mon:hover {
+  background: #3a404c;
+}
+/* 펫이 올라가는 모니터 */
+.map .mon.on {
+  background: #4a2020;
+  border-color: var(--accent);
+  color: var(--text);
+}
+.map .mon .res {
+  font-weight: 400;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+/* 선택된 모니터의 어느 코너에 붙는지 점으로 표시 */
+.map .corner {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(238, 21, 21, 0.25);
+}
+
+.hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+footer {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 16px 14px;
+  background: linear-gradient(0deg, var(--bg) 70%, rgba(29, 32, 39, 0));
+}
+footer button.wide {
+  margin-top: 0;
+}

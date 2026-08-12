@@ -1,12 +1,13 @@
 {
   "name": "pokemon-desktop-pet",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "로컬 전용 포켓몬 데스크탑 펫 (좌측 모니터 좌하단)",
   "main": "main.js",
   "scripts": {
     "fetch": "node scripts/fetch-sprites.js",
+    "icons": "node scripts/make-icons.js",
     "start": "electron .",
-    "dist": "node scripts/fetch-sprites.js && electron-builder"
+    "dist": "node scripts/fetch-sprites.js && node scripts/make-icons.js && electron-builder"
   },
   "author": "",
   "license": "MIT",
@@ -24,7 +25,8 @@
       "assets/**"
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "assets/icon.png"
     },
     "portable": {
       "artifactName": "PokemonPet.exe"

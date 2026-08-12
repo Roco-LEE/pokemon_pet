@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' file: data:; style-src 'self' 'unsafe-inline';"
+    />
+    <title>포켓몬 펫 설정</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <header>
+      <div class="title">
+        <h1 id="petName">포켓몬 펫</h1>
+        <p class="sub">설정은 바꾸는 즉시 적용됩니다</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="petVisible" />
+        <span>펫 보이기</span>
+      </label>
+    </header>
+
+    <main>
+      <section>
+        <h2>포켓몬</h2>
+        <div id="pokeGrid" class="grid"></div>
+        <button id="btnRandom" class="wide">랜덤 뽑기 🎲</button>
+        <p class="hint">직접 고르면 일반 색, 이로치는 랜덤 뽑기에서만 (1/16)</p>
+      </section>
+
+      <section>
+        <h2>크기</h2>
+        <label class="row">
+          <span>크기 배율</span>
+          <input type="range" id="scale" min="1" max="4" step="0.25" />
+          <output id="scaleOut"></output>
+        </label>
+      </section>
+
+      <section>
+        <h2>위치</h2>
+        <label class="row">
+          <span>모니터</span>
+          <select id="anchorDisplay"></select>
+        </label>
+        <div id="displayMap" class="map" aria-label="모니터 배치도"></div>
+        <p class="hint" id="mapHint"></p>
+        <label class="row">
+          <span>코너</span>
+          <select id="anchorCorner"></select>
+        </label>
+        <label class="row">
+          <span>가장자리 여백</span>
+          <input type="range" id="margin" min="0" max="160" step="4" />
+          <output id="marginOut"></output>
+        </label>
+        <button id="btnReset" class="wide">기준 위치로 되돌리기</button>
+      </section>
+
+      <section>
+        <h2>산책</h2>
+        <label class="switch row">
+          <input type="checkbox" id="walkEnabled" />
+          <span>자율 산책</span>
+        </label>
+        <label class="row">
+          <span>걷는 속도</span>
+          <input type="range" id="walkSpeed" min="0.2" max="4" step="0.1" />
+          <output id="walkSpeedOut"></output>
+        </label>
+        <label class="row">
+          <span>산책 범위</span>
+          <input type="range" id="walkWidths" min="1" max="10" step="0.5" />
+          <output id="walkWidthsOut"></output>
+        </label>
+        <label class="row">
+          <span>최소 간격</span>
+          <input type="range" id="walkMin" min="2" max="120" step="1" />
+          <output id="walkMinOut"></output>
+        </label>
+        <label class="row">
+          <span>최대 간격</span>
+          <input type="range" id="walkMax" min="2" max="180" step="1" />
+          <output id="walkMaxOut"></output>
+        </label>
+        <p class="hint">산책 범위는 펫 너비의 배수입니다 (모니터 비율과 무관)</p>
+      </section>
+
+      <section>
+        <h2>반응</h2>
+        <label class="switch row">
+          <input type="checkbox" id="soundEnabled" />
+          <span>울음소리 (클릭 시)</span>
+        </label>
+        <label class="switch row">
+          <input type="checkbox" id="speechEnabled" />
+          <span>말풍선</span>
+        </label>
+        <label class="row">
+          <span>말풍선 간격</span>
+          <input type="range" id="speechMin" min="5" max="120" step="1" />
+          <output id="speechMinOut"></output>
+        </label>
+        <label class="row">
+          <span>말풍선 최대</span>
+          <input type="range" id="speechMax" min="5" max="300" step="1" />
+          <output id="speechMaxOut"></output>
+        </label>
+        <label class="switch row">
+          <input type="checkbox" id="notifyEnabled" />
+          <span>알림 반응 (알림이 오면 쳐다보기)</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>수면</h2>
+        <label class="switch row">
+          <input type="checkbox" id="sleepEnabled" />
+          <span>수면 모드</span>
+        </label>
+        <label class="row">
+          <span>유휴 시간</span>
+          <input type="range" id="sleepIdle" min="1" max="120" step="1" />
+          <output id="sleepIdleOut"></output>
+        </label>
+        <label class="row">
+          <span>취침 시각</span>
+          <select id="nightStart"></select>
+        </label>
+        <label class="row">
+          <span>기상 시각</span>
+          <select id="nightEnd"></select>
+        </label>
+      </section>
+
+      <section>
+        <h2>시스템</h2>
+        <label class="switch row">
+          <input type="checkbox" id="autoLaunch" />
+          <span>윈도우 시작 시 자동 실행</span>
+        </label>
+        <p class="hint">
+          트레이 아이콘(몬스터볼)을 클릭하면 펫을 숨기거나 다시 부를 수 있습니다.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <button id="btnClose" class="wide primary">닫기</button>
+    </footer>
+
+    <script src="settings.js"></script>
+  </body>
+</html>
