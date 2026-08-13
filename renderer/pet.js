@@ -88,6 +88,9 @@ function spriteUrl(id, shiny) {
 function setPokemon(id, shiny) {
   state.pokemonId = id;
   state.shiny = !!shiny;
+  // 몸 모양이 통째로 바뀐다 → 클릭 판정용 마스크 폐기 (원본 크기도 포켓몬마다 다르다)
+  mask = null;
+  maskAt = 0;
   const url = spriteUrl(id, state.shiny);
   // 이로치 파일이 없을 수 있으니 실패 시 일반 스프라이트로 폴백
   sprite.onerror = () => {
@@ -404,6 +407,96 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
+// ---------- 클릭 통과 (투명 영역은 뒤에 있는 창/바탕화면이 받는다) ----------
+// 창은 점프 헤드룸 때문에 스프라이트보다 크고, 스프라이트 자체도 절반 이상이 투명하다.
+// 커서 아래 픽셀의 알파값을 보고 "펫 위"일 때만 메인에 창을 잡으라고 알린다.
+const HIT_ALPHA = 8; // 이 정도보다 진하면 몸통으로 친다
+const HIT_TOLERANCE = 4; // 커서 주변 이만큼(px) 안에 몸이 있으면 집을 수 있게 (꼬리·귀 끝 배려)
+const MASK_REFRESH_MS = 120; // GIF 프레임이 바뀌므로 마스크를 가끔 다시 뜬다
+const HIT_SAMPLES = [
+  [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
+];
+
+const maskCanvas = document.createElement('canvas');
+const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+let mask = null; // { data, w, h } — 현재 프레임의 픽셀
+let maskAt = 0;
+
+function refreshMask() {
+  maskAt = performance.now();
+  const w = sprite.naturalWidth;
+  const h = sprite.naturalHeight;
+  if (!w || !h) {
+    mask = null; // 아직 로딩 전
+    return;
+  }
+  if (maskCanvas.width !== w || maskCanvas.height !== h) {
+    maskCanvas.width = w;
+    maskCanvas.height = h;
+  }
+  maskCtx.clearRect(0, 0, w, h);
+  try {
+    maskCtx.drawImage(sprite, 0, 0);
+    mask = { data: maskCtx.getImageData(0, 0, w, h).data, w, h };
+  } catch {
+    mask = null; // 픽셀을 못 읽는 환경 → 사각형 판정으로 폴백
+  }
+}
+
+// 스프라이트가 실제로 그려진 사각형(창 좌표).
+// CSS는 object-fit: contain + center bottom이라 요소 박스와 그림 영역이 다르다.
+// GIF마다 원본 크기가 제각각이다(피카츄는 50×46). 요소 박스로 계산하면 좌표가 어긋난다.
+function spriteDrawRect() {
+  const r = sprite.getBoundingClientRect();
+  const nw = sprite.naturalWidth;
+  const nh = sprite.naturalHeight;
+  if (!nw || !nh || !r.width) return null;
+  const s = Math.min(r.width / nw, r.height / nh); // contain
+  const w = nw * s;
+  const h = nh * s;
+  return { x: r.left + (r.width - w) / 2, y: r.bottom - h, w, h };
+}
+
+function alphaAt(u, v) {
+  if (u < 0 || v < 0 || u >= mask.w || v >= mask.h) return 0;
+  return mask.data[((v | 0) * mask.w + (u | 0)) * 4 + 3];
+}
+
+function overPet(x, y) {
+  const r = spriteDrawRect();
+  if (!r) return false;
+  if (
+    x < r.x - HIT_TOLERANCE || x > r.x + r.w + HIT_TOLERANCE ||
+    y < r.y - HIT_TOLERANCE || y > r.y + r.h + HIT_TOLERANCE
+  ) {
+    return false; // 그림 바깥 → 볼 것도 없이 통과
+  }
+
+  if (performance.now() - maskAt > MASK_REFRESH_MS) refreshMask();
+  if (!mask) return true; // 픽셀을 못 읽으면 예전처럼 사각형으로 판정
+
+  const sx = r.w / mask.w;
+  const sy = r.h / mask.h;
+  let u = (x - r.x) / sx;
+  const v = (y - r.y) / sy;
+  if (state.facingLeft) u = mask.w - u; // 좌우반전으로 그려진 상태 보정
+  const tu = HIT_TOLERANCE / sx;
+  const tv = HIT_TOLERANCE / sy;
+  return HIT_SAMPLES.some(([du, dv]) => alphaAt(u + du * tu, v + dv * tv) > HIT_ALPHA);
+}
+
+let interactive = null; // 메인에 마지막으로 알린 상태 (전환될 때만 IPC)
+function setInteractive(on) {
+  if (interactive === on) return;
+  interactive = on;
+  window.pet.setInteractive(on);
+}
+
+function updateInteractive(e) {
+  // 잡고 있는 동안엔 절대 놓지 않는다 — 빠르게 끌면 커서가 몸을 벗어난다
+  setInteractive(down ? true : overPet(e.clientX, e.clientY));
+}
+
 // ---------- 마우스: 클릭 vs 드래그 ----------
 let down = null; // { startX, startY, winX, winY, moved }
 const DRAG_THRESHOLD = 4;
@@ -424,6 +517,8 @@ sprite.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
+  // 클릭이 통과 중일 때도 mousemove는 들어온다(forward: true) → 여기서 잡을지 말지를 정한다
+  updateInteractive(e);
   if (!down) return;
   const dx = e.screenX - down.startX;
   const dy = e.screenY - down.startY;
@@ -474,6 +569,8 @@ window.addEventListener('mouseup', async (e) => {
     }
     scheduleNextWalk();
   }
+  // 놓은 자리가 몸 위가 아닐 수 있다(던지듯 끌어놓기) → 다시 판정
+  updateInteractive(e);
 });
 
 // 우클릭 → 컨텍스트 메뉴
@@ -522,7 +619,11 @@ window.pet.onSetPokemon(({ id, shiny, announce }) => {
     showBubble('✨ 이로치다! ✨', 4000);
   }
 });
-window.pet.onPetEvent((data) => noticeEvent(data || {}));
+window.pet.onPetEvent((data) => {
+  // 숨겼다 다시 부르면 메인이 창을 통과 상태로 되돌린다 → 렌더러 쪽 캐시도 비워야 다시 알린다
+  if (data && data.kind === 'appear') interactive = null;
+  noticeEvent(data || {});
+});
 
 // 설정은 트레이·우클릭 메뉴·설정 창 어디서든 바뀔 수 있다 → 항상 전체 설정을 다시 반영한다.
 window.pet.onConfigChanged((cfg) => applyConfig(cfg));

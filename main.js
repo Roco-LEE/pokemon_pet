@@ -77,6 +77,7 @@ let tray = null;
 let settingsWin = null;
 let config = { ...DEFAULT_CONFIG };
 let petVisible = true; // 트레이에서 숨김/보이기 (앱을 껐다 켜면 항상 보이는 상태로 시작)
+let petInteractive = false; // 창이 마우스를 잡고 있는지 (커서가 펫의 불투명 픽셀 위일 때만 true)
 
 // 중복 실행 방지: 이미 떠 있으면 새 인스턴스는 즉시 종료
 const gotLock = app.requestSingleInstanceLock();
@@ -284,6 +285,10 @@ function createWindow() {
   });
 
   win.setAlwaysOnTop(true, 'screen-saver');
+  // 기본은 창 전체가 클릭을 통과시킨다. 렌더러가 "커서가 펫 위"라고 알릴 때만 잡는다(§7).
+  // forward: true → 통과 상태에서도 mousemove는 렌더러에 전달되어 판정을 이어갈 수 있다.
+  win.setIgnoreMouseEvents(true, { forward: true });
+  petInteractive = false;
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   // 모니터 구성이 바뀌면 기준 코너로 재배치하고, 렌더러 좌표계도 다시 맞춘다.
@@ -421,6 +426,9 @@ function setPetVisible(visible) {
   if (petVisible) {
     win.showInactive(); // 포커스를 뺏지 않고 등장 (작업 중이던 창 그대로)
     win.setAlwaysOnTop(true, 'screen-saver');
+    // 숨어 있는 동안 커서가 어디로 갔는지 알 수 없다 → 통과 상태로 되돌리고 다시 판정하게 한다
+    win.setIgnoreMouseEvents(true, { forward: true });
+    petInteractive = false;
     pokePet('appear');
   } else {
     win.hide();
@@ -680,6 +688,13 @@ ipcMain.on('move-window-to', (_e, { x, y }) => {
 });
 
 ipcMain.on('reset-position', () => resetPosition());
+
+// 클릭 통과 토글. 렌더러가 커서 아래 픽셀을 보고 "지금은 잡아라 / 통과시켜라"를 알린다.
+ipcMain.on('set-interactive', (_e, on) => {
+  if (!win || petInteractive === !!on) return;
+  petInteractive = !!on;
+  win.setIgnoreMouseEvents(!petInteractive, { forward: true });
+});
 
 ipcMain.on('show-context-menu', () => {
   buildContextMenu().popup({ window: win });

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('pet', {
   moveTo: (x, y) => ipcRenderer.send('move-window-to', { x, y }),
   resetPosition: () => ipcRenderer.send('reset-position'),
 
+  // 클릭 통과: 커서가 펫(불투명 픽셀) 위일 때만 창이 마우스를 잡는다
+  setInteractive: (on) => ipcRenderer.send('set-interactive', on),
+
   // 메뉴 / 종료
   showContextMenu: () => ipcRenderer.send('show-context-menu'),
   openSettings: () => ipcRenderer.send('open-settings'),
