@@ -1,62 +1,148 @@
-# 포켓몬 데스크탑 펫 🐾
+<div align="center">
 
-윈도우 바탕화면 왼쪽 하단에 포켓몬을 펫처럼 띄워두는 Electron 데스크탑 앱.
-마우스로 클릭·드래그하며 상호작용하고, 6종 포켓몬을 전환할 수 있습니다. 로컬 전용.
+# 🐾 포켓몬 데스크탑 펫
 
-<!-- 실제 작동 GIF를 아래에 추가하세요 -->
-<!-- ShareX / ScreenToGif 등으로 녹화 후 docs/demo.gif 로 저장 -->
-<!-- ![demo](docs/demo.gif) -->
+**윈도우 바탕화면에 포켓몬을 펫처럼 띄워 두는 Electron 앱**
 
-## 기능
+![Electron](https://img.shields.io/badge/Electron-47848F?style=flat-square&logo=electron&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) ![Windows](https://img.shields.io/badge/Windows-0078D4?style=flat-square&logoColor=white) ![version](https://img.shields.io/badge/version-0.5.1-lightgrey?style=flat-square)
 
-- 🖥️ 멀티모니터 환경에서 **원하는 모니터의 원하는 코너**에 자동 배치 (우클릭 → 위치, DPI·작업표시줄 자동 보정)
-- 🎞️ PokeAPI의 Gen5 애니메이션 스프라이트로 idle 모션
-- 🖱️ **클릭** 반응 / **드래그** 이동 / **우클릭** 전환 메뉴 — 펫의 **몸 위에서만** 마우스를 잡고, 빈 공간은 바탕화면으로 클릭이 통과한다
-- 🤾 **드래그 모션** — 들어올리면 버둥거리고, 놓으면 **바닥으로 뚝 떨어져** 통통 착지
-- 🔊 **울음소리** — 클릭하면 PokeAPI cries로 실제 울음 재생 (메뉴에서 on/off)
-- 💬 **말풍선** — 가끔 한마디 & 시간대 코멘트, **포켓몬별 고유 대사** ("꼬북꼬북!", "파이리!" 등)
-- 😴 **수면 모드** — 일정 시간 무반응이거나 밤 시간대(기본 22~07시)엔 Zzz, 클릭하면 깨어나며 **기상 직후 잠깐 굼뜨게** 움직임
-- 🚶 가끔 정해진 범위 안에서 자율 산책 (상태머신: IDLE / WALK / DRAG / FALL / SLEEP)
-- 🌑 **바닥 그림자 + 보행 모션** — 땅에 서 있는 느낌의 타원 그림자, 걸을 때 위아래 bobbing
-- 🎲 **랜덤 뽑기** — 무작위 포켓몬 + **1/16 확률로 이로치** 등장
-- 🔔 **알림 반응** — 윈도우 알림이 오면 하던 걸 멈추고 **그쪽을 쳐다본다** (잠금 해제·절전 복귀에도 반응)
-- 🧰 **트레이 아이콘** — 몬스터볼 아이콘 클릭으로 숨기기/다시 부르기, 포켓몬 전환·설정·종료
-- ⚙️ **설정 창** — 크기·속도·산책 범위·위치·수면 시각을 슬라이더로 조절, **바꾸는 즉시 반영**
-- 🖵 **모니터 직접 선택** — 연결된 모니터를 모델명(`LG IPS FULLHD` 등)으로 감지해 목록·**배치도**로 보여주고, 클릭해서 펫을 올릴 화면을 고른다
-- 🚀 **윈도우 시작 시 자동 실행** (설정 창에서 on/off)
-- 💾 설정 영속화(`config.json`)
-- 📦 단일 포터블 exe로 빌드 가능
+</div>
 
-대상 포켓몬: 이상해씨 · 파이리 · 꼬부기 · 피카츄 · 메타몽 · 이브이
+<br />
 
-## 실행 방법
+## 💁🏻‍♂️ 소개
+
+> 바탕화면 구석에서 포켓몬이 걷고, 자고, 클릭하면 울음소리로 반응하는 데스크탑 펫.<br>
+> 투명·프레임리스·항상 위 창 하나로 동작하고, 빈 영역은 클릭이 바탕화면으로 통과.<br>
+> 멀티모니터·세로 모니터 환경 대응, 트레이·설정 창·자동 실행까지 포함한 포터블 exe.
+
+- 대상 포켓몬: 이상해씨 · 파이리 · 꼬부기 · 피카츄 · 메타몽 · 이브이 (+ 1/16 확률 이로치)
+- 로컬 전용 · 비영리 개인 팬 프로젝트
+- 설계·트러블슈팅 상세는 [DEVELOPMENT.md](DEVELOPMENT.md)
+
+<p align="center"><img width="400" alt="데모 — 드래그 후 낙하, 우클릭 메뉴로 포켓몬 전환" src="docs/demo.gif"></p>
+
+<br />
+
+## 🦾 기능
+
+### 🖱️ 상호작용
+클릭 시 반응 모션 + 울음소리(PokeAPI cries). 드래그하면 버둥거리고, 놓으면 바닥까지 낙하 후 착지. 펫의 몸 위에서만 마우스를 잡고 빈 영역은 클릭 통과.
+
+### 🚶 자율 행동
+상태머신(IDLE / WALK / DRAG / FALL / SLEEP) 기반. 정해진 범위 안에서 가끔 산책, 일정 시간 무반응 또는 밤 시간대(기본 22~07시)엔 수면. 기상 직후 잠시 굼뜨게 움직임. 바닥 그림자 + 보행 bobbing.
+
+### 💬 말풍선 · 알림 반응
+가끔 한마디와 시간대 코멘트, 포켓몬별 고유 대사. 윈도우 알림이 오면 하던 걸 멈추고 그쪽을 쳐다봄(잠금 해제·절전 복귀에도 반응).
+
+<img width="320" alt="말풍선 — 메타몽 '뭐해?', 피카츄 '반가워!'" src="docs/bubble.gif">
+
+### 🖥️ 멀티모니터
+연결된 모니터를 모델명·해상도·회전까지 감지해 배치도로 표시, 클릭해서 펫을 올릴 화면 선택. 코너 4방향 배치, DPI·작업표시줄 자동 보정. 모니터를 끄면 다른 화면으로 피했다가 다시 켜면 복귀.
+
+### ⚙️ 설정 · 트레이
+설정 창에서 크기·속도·산책 범위·위치·수면 시각 조절, 바꾸는 즉시 반영. 몬스터볼 트레이 아이콘으로 숨기기/다시 부르기. 윈도우 시작 시 자동 실행. 설정은 `config.json`에 저장.
+
+<img width="245" alt="트레이 메뉴" src="docs/tray_menu.png">
+
+### 🎲 랜덤 뽑기
+우클릭 메뉴에서 무작위 포켓몬 뽑기. 1/16 확률로 이로치.
+
+<br />
+
+## 🔧 문제 해결
+
+실사용 중 겪은 문제와 원인 분석. 전체 기록은 [DEVELOPMENT.md §14](DEVELOPMENT.md#14-트러블슈팅-기록).
+
+### 앱 전체가 먹통 — 세로 모니터에서만 발생 (v0.3.0)
+- **증상**: 클릭·드래그·우클릭 모두 무반응, GIF는 계속 재생
+- **진단**: 렌더러 프로세스 CPU를 3초간 측정 → 3.22초 소모 = 코어 1개 100% 점유. 크래시가 아니라 동기 루프에 갇힌 행(hang)
+- **원인**: 산책 목적지 추첨이 종료 조건 없는 rejection sampling. 세로 모니터(1080px)에서 산책 범위 162px < 요구 이동 거리 조건을 만족하는 해가 없는 구간이 생김. v0.2.1의 창 여백 추가와 v0.3.0의 "걷는 중 클릭하면 멈춤"이 겹쳐서 드러난 잠재 버그
+- **수정**: 추첨 12회 상한 + 실패 시 더 먼 쪽 끝으로 폴백. 산책 범위 기준을 "화면 가로폭 15%" → "펫 너비 3배"로 변경 (세로 모니터 162px → 750px)
+
+### 투명 영역이 클릭을 가로챔 (v0.5.1)
+- **증상**: 크기를 4배까지 키울 수 있게 되면서 투명한 창(499×557px)이 좌하단 바탕화면 아이콘을 가림
+- **수정**: 창은 기본 클릭 통과(`setIgnoreMouseEvents(true, { forward: true })`), 커서 아래 **픽셀 알파값**으로 펫 몸 위일 때만 잡음. 좌우반전·`object-fit` 보정, 관용 반경 4px, 드래그 중엔 판정 생략
+- **결과**: 마우스를 막는 면적 **100% → 27.3%** (사각형 판정이었다면 59%)
+
+### 모니터를 옮기면 예전 자리로 순간이동 (v0.4.0)
+- **원인**: 렌더러가 들고 있는 좌표계 사본(작업영역·바닥 높이·위치)이 초기화 때 한 번만 설정되고 갱신되지 않음. 갱신용 IPC는 만들어 두고 호출하는 곳이 없었음
+- **수정**: 갱신 경로를 3개(메인 재배치 시 푸시 · 드롭 직후 폴 · 초기화)로 명시하고 `applyGeometry()` 한 곳으로 통합
+
+### 알림 감지가 간헐적으로만 동작 (v0.5.0)
+- **배경**: Electron에는 OS 알림을 관찰하는 API가 없음 → 윈도우 알림 DB의 WAL 파일 변화를 감지하는 방식 채택
+- **원인**: `fs.watch`가 알림 서비스가 열어 둔 채 쓰는 파일의 변경을 지연·누락. 한 번 성공한 관측을 근거로 "Electron 토스트는 안 뜬다"는 잘못된 가설을 세웠다가, 알림 센터와 WAL 내용을 직접 확인해 반증
+- **수정**: 파일 크기 폴링(1.5초)으로 교체 → 토스트 발생 **+0.3초**에 안정적으로 포착, 유휴 시 오탐 0건. 알림 내용은 읽지 않음
+
+<br />
+
+## 🤓 시작하기
+
+**Prerequisites**
+
+- Windows 10/11
+- [Node.js](https://nodejs.org/) 18+
+
+**실행**
 
 ```bash
-npm install          # 의존성 설치
-npm run fetch        # PokeAPI에서 스프라이트 다운로드 (최초 1회)
-npm start            # 앱 실행
+# 의존성 설치 (폴더를 옮겼거나 처음 받았을 때)
+npm install
+
+# PokeAPI에서 스프라이트·울음소리 다운로드 (최초 1회)
+npm run fetch
+
+# 앱 실행
+npm start
+
+# 콘솔 창 없이 실행: start-pet.vbs 더블클릭
+
+# 포터블 exe 빌드 → dist/PokemonPet.exe
+npm run dist
 ```
 
-> 스프라이트(`assets/sprites/`)는 저작권 문제로 레포에 포함하지 않습니다.
-> `npm run fetch`가 [PokeAPI/sprites](https://github.com/PokeAPI/sprites)에서 직접 받아옵니다.
+> 스프라이트·울음소리(`assets/sprites/`, `assets/cries/`)는 저작권 문제로 저장소에 포함하지 않음. `npm run fetch`가 [PokeAPI/sprites](https://github.com/PokeAPI/sprites)에서 직접 받아옴.<br>
+> `node_modules/`도 저장소에 없으므로, 폴더를 옮긴 뒤 `start-pet.vbs`가 반응이 없으면 `npm install`부터.
 
-## 포터블 exe 빌드 (윈도우)
+<br />
 
-```bash
-npm run dist         # dist/PokemonPet.exe 생성
+## 📚 기술 스택
+
+| 역할 | 종류 |
+| :--- | :--- |
+| Runtime | ![Electron](https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white) — 투명·프레임리스·항상 위 창, 멀티모니터 좌표 제어 |
+| Language | ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black) — 빌드 도구 없음 |
+| 구조 | 메인/렌더러 분리 + `contextIsolation` preload 브리지, `requestAnimationFrame` 상태머신 루프 |
+| Asset | PokeAPI Gen5 애니메이션 스프라이트(GIF) · cries |
+| Build | electron-builder — 단일 포터블 exe |
+
+<br />
+
+## 📂 폴더 구조
+
+```
+├── 📜 main.js            메인 프로세스 — 창 생성·모니터 배치·메뉴·트레이·IPC·설정·알림 감지
+├── 📜 preload.js         렌더러 ↔ 메인 브리지 (contextBridge)
+├── 📂 renderer
+│   ├── index.html        펫 표시용 투명 페이지
+│   ├── pet.js            상태머신·물리·마우스 판정·말풍선·수면
+│   ├── style.css         스프라이트 배치·모션 애니메이션
+│   └── settings.*        설정 창
+├── 📂 scripts
+│   ├── fetch-sprites.js  PokeAPI에서 스프라이트·울음소리 받기
+│   └── make-icons.js     몬스터볼 아이콘 PNG 생성 (zlib만으로 직접 인코딩)
+├── 📂 assets             아이콘 (스프라이트·울음소리는 fetch로 채움, git 제외)
+├── 📂 docs               README 데모 GIF · 스크린샷
+├── 📜 start-pet.vbs      콘솔 없이 실행하는 런처
+└── 📕 DEVELOPMENT.md     설계·트러블슈팅 문서
 ```
 
-## 기술 스택
+<br />
 
-- **Electron** — 투명·프레임리스·항상위 창, 멀티모니터 좌표 제어
-- 메인/렌더러 분리 + `contextIsolation` preload 브리지
-- 상태머신 기반 애니메이션 루프(`requestAnimationFrame`)
+## 🗂️ 버전 기록
 
-구조와 커스터마이징 지점은 [DEVELOPMENT.md](DEVELOPMENT.md) 참고.
-
----
-
-## 버전 기록
+<details>
+<summary>v0.1.0 ~ v0.5.1 전체 기록</summary>
 
 ### v0.5.1 — 클릭 통과 수정
 - 🖱️ **투명 영역이 마우스를 먹던 문제 수정** — 펫 창은 점프 모션용 여백 때문에 스프라이트보다 크고, 스프라이트 자체도 절반 이상이 투명하다. 그런데 창 전체가 클릭을 가로채서 **좌하단 바탕화면 아이콘이 눌리지 않았다**. 이제 커서 아래 **픽셀의 투명도를 보고** 펫의 몸 위에서만 창이 마우스를 잡는다 (마우스를 막는 면적 **100% → 27%**)
@@ -111,9 +197,11 @@ npm run dist         # dist/PokemonPet.exe 생성
 - 설정 영속화 (`config.json`)
 - 포터블 exe 빌드 지원
 
----
+</details>
 
-## 라이선스 / 고지
+<br />
+
+## 📜 라이선스 / 고지
 
 - 이 저장소의 **소스 코드**는 MIT 라이선스로 제공됩니다.
 - **포켓몬 및 모든 스프라이트의 저작권은 Nintendo / Creatures Inc. / GAME FREAK inc. / The Pokémon Company에 있습니다.**
